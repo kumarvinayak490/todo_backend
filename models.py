@@ -33,4 +33,7 @@ class Todo(BaseModel):
     description: Optional[str] = None
     completed: bool = False
 
+class StatusUpdate(BaseModel):
+    completed:bool
+
 

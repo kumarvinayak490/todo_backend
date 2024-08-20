@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException, Depends
 import pyrebase
 import uvicorn
-from models import LoginSchema,SignUpSchema, Todo
+from models import LoginSchema,SignUpSchema, Todo,StatusUpdate
 from fastapi.responses import JSONResponse
 from fastapi.requests import  Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
 
 
 app =  FastAPI(
@@ -12,6 +13,17 @@ app =  FastAPI(
         title="Todo App",
         docs_url="/"
     )
+
+origins = ["http://localhost:3000"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 import firebase_admin
@@ -121,6 +133,7 @@ async def update_todo(id: str, updated_todo: Todo, user: dict = Depends(verify_t
             raise HTTPException(status_code=403, detail="Permission denied")
         
         updated_todo_dict = updated_todo.dict()
+        print(updated_todo_dict)
         
         db.child("todos").child(id).update(updated_todo_dict)
         
@@ -132,6 +145,23 @@ async def update_todo(id: str, updated_todo: Todo, user: dict = Depends(verify_t
         raise e  
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))  
+    
+
+@app.put("/change_status/{id}")
+async def change_status(id:str, updated_todo: StatusUpdate, user: dict = Depends(verify_token)):
+    try:
+        existing_todo = db.child("todos").child(id).get().val()
+        print(existing_todo, "existing_todo")
+        if not existing_todo:
+            raise HTTPException(status_code=404, detail="Todo not found")
+        if existing_todo.get("user_id") != user["uid"]:
+            raise HTTPException(status_code=403, detail="Permission denied")
+        
+        db.child("todos").child(id).update({"completed": updated_todo.completed})
+        updated_item = db.child("todos").child(id).get().val()
+        return {"msg": "Todo status updated successfully", "updated_todo": updated_item}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
 
 @app.delete("/todos/{id}")
